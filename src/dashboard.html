@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SERP DERP — Geogentia CTI-Ad Triage</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080b16;--bg2:#0d1225;--glass:rgba(13,18,40,0.75);--glass-border:rgba(255,255,255,0.07);
+  --text:#e8eaf6;--text2:#8e93a7;--text3:#555b70;
+  --red:#e94560;--blue:#4f8cf7;--green:#00c853;--yellow:#ffc107;--purple:#7c4dff;--orange:#ff6b35;
+  --font:'Inter',sans-serif;--mono:'JetBrains Mono',monospace;--r:12px;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at 20% 50%,rgba(79,140,247,0.06) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(124,77,255,0.05) 0%,transparent 50%);pointer-events:none;z-index:0}
+.wrap{max-width:1200px;margin:0 auto;padding:20px 24px;position:relative;z-index:1}
+
+/* Header */
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--glass-border)}
+.hdr h1{font-size:22px;font-weight:700;background:linear-gradient(135deg,var(--blue),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-.5px}
+.hdr .sub{font-size:13px;color:var(--text2);margin-left:12px;font-weight:400}
+.status-dot{width:10px;height:10px;border-radius:50%;background:var(--text3);display:inline-block;margin-right:8px;transition:background .3s}
+.status-dot.running{background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
+.status-dot.error{background:var(--red);box-shadow:0 0 8px var(--red)}
+.status-dot.done{background:var(--blue);box-shadow:0 0 8px var(--blue)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.status-text{font-size:13px;color:var(--text2);display:flex;align-items:center}
+
+/* Cards */
+.card{background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--r);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);padding:20px;margin-bottom:16px;transition:border-color .3s}
+.card:hover{border-color:rgba(255,255,255,0.12)}
+.card h2{font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text2);margin-bottom:14px}
+
+/* Drag & Drop Zone */
+.drop-zone{border:2px dashed var(--glass-border);border-radius:var(--r);padding:40px 20px;text-align:center;cursor:pointer;transition:all .3s;margin-bottom:16px}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--blue);background:rgba(79,140,247,0.05)}
+.drop-zone.has-file{border-color:var(--green);border-style:solid;background:rgba(0,200,83,0.05)}
+.drop-zone .icon{font-size:32px;margin-bottom:8px}
+.drop-zone .main-text{font-size:14px;font-weight:500;color:var(--text)}
+.drop-zone .sub-text{font-size:12px;color:var(--text3);margin-top:4px}
+.drop-zone .file-name{font-family:var(--mono);font-size:13px;color:var(--green);margin-top:8px}
+.or-path{font-size:12px;color:var(--text3);margin-bottom:8px;text-align:center}
+
+/* Config grid */
+.cfg-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px}
+.field label{display:block;font-size:12px;color:var(--text2);margin-bottom:4px;font-weight:500}
+.field input{width:100%;padding:10px 12px;background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;transition:border-color .2s}
+.field input:focus{border-color:var(--blue)}
+.field input::placeholder{color:var(--text3)}
+.btn-row{display:flex;gap:10px;margin-top:16px;align-items:center}
+.btn{padding:10px 24px;border:none;border-radius:8px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:8px}
+.btn-start{background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff}
+.btn-start:hover{filter:brightness(1.15);transform:translateY(-1px)}
+.btn-start:disabled{opacity:.4;cursor:not-allowed;transform:none;filter:none}
+.btn-stop{background:rgba(233,69,96,0.15);color:var(--red);border:1px solid rgba(233,69,96,0.3)}
+.btn-stop:hover{background:rgba(233,69,96,0.25)}
+.btn-stop:disabled{opacity:.3;cursor:not-allowed}
+.checks{display:flex;gap:20px;align-items:center}
+.checks label{font-size:13px;color:var(--text2);display:flex;align-items:center;gap:6px;cursor:pointer}
+.checks input[type=checkbox]{accent-color:var(--blue)}
+
+/* Progress */
+.progress-section{display:none}
+.progress-section.visible{display:block}
+.phase-steps{display:flex;align-items:center;gap:0;margin-bottom:16px;justify-content:center}
+.phase-step{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text3);font-weight:500;transition:color .3s}
+.phase-step.active{color:var(--blue)}
+.phase-step.done{color:var(--green)}
+.phase-dot{width:8px;height:8px;border-radius:50%;background:var(--text3);transition:all .3s}
+.phase-step.active .phase-dot{background:var(--blue);box-shadow:0 0 6px var(--blue)}
+.phase-step.done .phase-dot{background:var(--green)}
+.phase-line{width:30px;height:1px;background:var(--text3);margin:0 4px;transition:background .3s}
+.phase-line.done{background:var(--green)}
+.progress-track{height:28px;background:rgba(255,255,255,0.04);border-radius:14px;overflow:hidden;position:relative;margin-bottom:8px}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--purple),var(--red));border-radius:14px;transition:width .5s ease;position:relative;min-width:0}
+.progress-fill::after{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent);animation:shimmer 2.5s infinite}
+@keyframes shimmer{to{left:100%}}
+.progress-info{display:flex;justify-content:space-between;font-size:13px;color:var(--text2)}
+.progress-pct{font-size:15px;font-weight:700;color:var(--text);font-family:var(--mono)}
+.progress-msg{font-size:13px;color:var(--text2);margin-top:4px;text-align:center}
+
+/* Stats Grid */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.stat-card{background:var(--glass);border:1px solid var(--glass-border);border-radius:10px;padding:14px;text-align:center;transition:border-color .3s}
+.stat-card:hover{border-color:rgba(255,255,255,0.15)}
+.stat-val{font-size:24px;font-weight:700;font-family:var(--mono);line-height:1.2}
+.stat-label{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-top:4px;font-weight:500}
+.stat-card.blue .stat-val{color:var(--blue)}
+.stat-card.green .stat-val{color:var(--green)}
+.stat-card.purple .stat-val{color:var(--purple)}
+.stat-card.red .stat-val{color:var(--red)}
+.stat-card.orange .stat-val{color:var(--orange)}
+
+/* Risk Bars */
+.risk-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.risk-label{width:70px;font-size:12px;font-weight:600;text-align:right}
+.risk-track{flex:1;height:22px;background:rgba(255,255,255,0.04);border-radius:6px;overflow:hidden}
+.risk-bar{height:100%;border-radius:6px;transition:width .8s ease;min-width:0}
+.risk-count{width:80px;font-size:13px;font-family:var(--mono);color:var(--text2)}
+.risk-HIGH .risk-label{color:var(--red)}.risk-HIGH .risk-bar{background:var(--red)}
+.risk-MEDIUM .risk-label{color:var(--yellow)}.risk-MEDIUM .risk-bar{background:var(--yellow)}
+.risk-LOW .risk-label{color:var(--green)}.risk-LOW .risk-bar{background:var(--green)}
+.risk-NONE .risk-label{color:var(--text3)}.risk-NONE .risk-bar{background:var(--text3)}
+
+/* Two Column Layout */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+
+/* Log */
+.log-box{height:300px;overflow-y:auto;background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;font-family:var(--mono);font-size:12px;line-height:1.8}
+.log-box::-webkit-scrollbar{width:6px}
+.log-box::-webkit-scrollbar-track{background:transparent}
+.log-box::-webkit-scrollbar-thumb{background:var(--text3);border-radius:3px}
+.log-entry{animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.log-entry .ts{color:var(--text3)}
+.log-entry.hit{color:var(--green)}
+.log-entry.flag{color:var(--red);font-weight:500}
+.log-entry.cache{color:var(--text3)}
+.log-entry.err{color:var(--red)}
+.log-entry.info{color:var(--text2)}
+.log-entry.phase{color:var(--blue);font-weight:600}
+
+/* Results Table */
+.results-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+.results-table th{text-align:left;color:var(--text2);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--glass-border);text-transform:uppercase;letter-spacing:.5px;font-size:11px}
+.results-table td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.03);color:var(--text);vertical-align:top}
+.results-table tr:hover td{background:rgba(255,255,255,0.02)}
+.tier-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-weight:600;font-size:11px}
+.tier-HIGH{background:rgba(233,69,96,0.2);color:var(--red)}
+.tier-MEDIUM{background:rgba(255,193,7,0.2);color:var(--yellow)}
+.tier-LOW{background:rgba(0,200,83,0.15);color:var(--green)}
+
+/* Completion / Error Banners */
+.complete-banner{display:none;background:linear-gradient(135deg,rgba(0,200,83,0.1),rgba(79,140,247,0.1));border:1px solid rgba(0,200,83,0.3);border-radius:var(--r);padding:20px;text-align:center;margin-bottom:16px}
+.complete-banner.visible{display:block;animation:fadeIn .5s ease}
+.complete-banner h3{color:var(--green);font-size:18px;margin-bottom:8px}
+.complete-banner p{color:var(--text2);font-size:13px}
+.error-banner{display:none;background:rgba(233,69,96,0.1);border:1px solid rgba(233,69,96,0.3);border-radius:var(--r);padding:16px;margin-bottom:16px}
+.error-banner.visible{display:block}
+.error-banner h3{color:var(--red);font-size:14px;margin-bottom:6px}
+.error-banner pre{color:var(--text2);font-size:12px;font-family:var(--mono);white-space:pre-wrap;max-height:200px;overflow-y:auto}
+
+/* Disclaimer Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:1000;display:flex;align-items:center;justify-content:center;animation:fadeIn .3s ease}
+.modal-overlay.hidden{display:none}
+.modal{background:var(--bg2);border:1px solid var(--glass-border);border-radius:16px;padding:32px;max-width:640px;width:90%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+.modal h2{font-size:20px;font-weight:700;background:linear-gradient(135deg,var(--blue),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:16px;text-align:center}
+.modal p{font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:14px}
+.modal .legal{font-size:11px;color:var(--text3);font-style:italic;line-height:1.6;border-top:1px solid var(--glass-border);padding-top:14px;margin-top:14px}
+.modal .btn-accept{display:block;margin:20px auto 0;padding:12px 40px;background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;border:none;border-radius:8px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;transition:all .2s}
+.modal .btn-accept:hover{filter:brightness(1.15);transform:translateY(-1px)}
+
+/* About Section */
+.about-section{margin-bottom:16px;padding:16px 20px;background:linear-gradient(135deg,rgba(79,140,247,0.05),rgba(124,77,255,0.05));border:1px solid var(--glass-border);border-radius:var(--r)}
+.about-section p{font-size:12px;color:var(--text2);line-height:1.7;margin:0}
+.about-section strong{color:var(--text);font-weight:600}
+
+@media(max-width:768px){
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .two-col{grid-template-columns:1fr}
+  .cfg-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <div class="hdr">
+    <div style="display:flex;align-items:baseline">
+      <h1>SERP DERP</h1>
+      <span class="sub">by Geogentia</span>
+    </div>
+    <div class="status-text">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusLabel">Idle</span>
+    </div>
+  </div>
+
+  <!-- Error Banner -->
+  <div class="error-banner" id="errorBanner">
+    <h3>⚠ Pipeline Error</h3>
+    <pre id="errorMsg"></pre>
+  </div>
+
+  <!-- Completion Banner -->
+  <div class="complete-banner" id="completeBanner">
+    <h3>✅ Pipeline Complete</h3>
+    <p id="completeMsg"></p>
+    <button id="btnOpenOutput" style="margin-top:12px;padding:8px 16px;background:var(--green);color:#0b1020;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer">📂 Open Output Folder</button>
+  </div>
+
+  <!-- Disclaimer Modal -->
+  <div class="modal-overlay" id="disclaimerModal">
+    <div class="modal">
+      <h2>Welcome to Geogentia's SERP DERP</h2>
+      <p>This tool uses your API key from SERPAPI.com to conduct large-scale search engine queries involving phone numbers, addresses, and keywords commonly associated with massage advertisements and related reviews. Its purpose is to identify public online indicators that may merit additional investigative review for possible illicit massage parlor activity.</p>
+      <p>This tool does not hack, access restricted systems, or obtain non-public information. It automates lawful searches of publicly accessible search engine results.</p>
+      <p class="legal">All results are preliminary investigative leads only and must be independently verified before being relied upon. Geogentia makes no representations or warranties regarding the accuracy, completeness, or truth of any result generated by this tool. Users are solely responsible for evaluating, corroborating, and determining the appropriate use of any information produced.</p>
+      <button class="btn-accept" onclick="acceptDisclaimer()">I Understand – Continue</button>
+    </div>
+  </div>
+
+  <!-- About -->
+  <div class="about-section">
+    <p>Thank you for using <strong>SERP DERP</strong>, created by <strong>Geogentia</strong> and our interns. Geogentia is an intelligence firm that specializes in leveraging unique datasets and innovative investigative methods to uncover insights others miss. By combining advanced analytics, geospatial intelligence, and nontraditional data sources, Geogentia helps clients identify patterns, connections, and risks that are often difficult to detect through conventional investigative approaches alone. The firm supports law enforcement, government, and private sector clients with tailored solutions designed to make investigations faster, more precise, and more actionable.</p>
+  </div>
+
+  <!-- Config -->
+  <div class="card" id="configCard">
+    <h2>⚙ Configuration</h2>
+
+    <!-- Drag & Drop Zone -->
+    <div class="drop-zone" id="dropZone">
+      <div class="icon">📂</div>
+      <div class="main-text">Drag & drop your CSV here</div>
+      <div class="sub-text">or click to browse</div>
+      <div class="file-name" id="dropFileName" style="display:none"></div>
+    </div>
+    <div style="text-align:center;margin:-8px 0 12px;font-size:12px;color:var(--text3)">
+      Need a starting point? <a href="#" id="downloadTemplate" style="color:var(--blue);text-decoration:none">⬇ Download CSV template</a>
+    </div>
+    <div class="or-path">Or paste a file path:</div>
+    <div style="margin-bottom:16px">
+      <input type="text" id="csvPath" placeholder="C:\path\to\establishments.csv" style="width:100%;padding:10px 12px;background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none">
+    </div>
+    <div style="margin-bottom:16px">
+      <input type="password" id="apiKey" placeholder="Paste your SERPAPI Key here" style="width:100%;padding:10px 12px;background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none">
+    </div>
+    <input type="file" id="fileInput" accept=".csv" style="display:none">
+
+    <div class="cfg-grid">
+      <div class="field"><label>Limit (0 = all)</label><input type="number" id="limit" value="0" min="0"></div>
+      <div class="field"><label>Search Delay (ms)</label><input type="number" id="delay" value="1500" min="100"></div>
+      <div class="field"><label>Fetch Delay (ms)</label><input type="number" id="fetchDelay" value="500" min="100"></div>
+      <div class="field"><label>Output Directory</label><input type="text" id="outputDir" value="./output"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-start" id="btnStart" onclick="startPipeline()">▶ Start Run</button>
+      <button class="btn btn-stop" id="btnStop" onclick="stopPipeline()" disabled>⏹ Stop</button>
+      <div class="checks" style="margin-left:auto">
+        <label><input type="checkbox" id="captureAds"> Capture Ads</label>
+        <label><input type="checkbox" id="addressOnly"> Address Only</label>
+        <label><input type="checkbox" id="noCache"> No Cache</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-section" id="progressSection">
+    <div class="card">
+      <div class="phase-steps" id="phaseSteps">
+        <div class="phase-step" data-phase="phone_search"><span class="phase-dot"></span>📞 Phone</div>
+        <div class="phase-line" data-after="phone_search"></div>
+        <div class="phase-step" data-phase="address_search"><span class="phase-dot"></span>📍 Address</div>
+        <div class="phase-line" data-after="address_search"></div>
+        <div class="phase-step" data-phase="deepscan"><span class="phase-dot"></span>🔍 Deep Scan</div>
+        <div class="phase-line" data-after="deepscan"></div>
+        <div class="phase-step" data-phase="output"><span class="phase-dot"></span>📊 Output</div>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill" style="width:0%"></div>
+      </div>
+      <div class="progress-info">
+        <span id="progressPct" class="progress-pct">0%</span>
+        <span id="progressCount">0 / 0</span>
+        <span id="progressEta">—</span>
+      </div>
+      <div class="progress-msg" id="progressMsg"></div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card blue"><div class="stat-val" id="statApi">0</div><div class="stat-label">API Calls</div></div>
+      <div class="stat-card green"><div class="stat-val" id="statCache">0</div><div class="stat-label">Cached</div></div>
+      <div class="stat-card purple"><div class="stat-val" id="statPages">0</div><div class="stat-label">Pages Scanned</div></div>
+      <div class="stat-card orange"><div class="stat-val" id="statAddr">0</div><div class="stat-label">Address Searches</div></div>
+    </div>
+
+    <!-- Risk + Log -->
+    <div class="two-col">
+      <div class="card">
+        <h2>Risk Distribution</h2>
+        <div id="riskBars">
+          <div class="risk-row risk-HIGH"><span class="risk-label">🔴 HIGH</span><div class="risk-track"><div class="risk-bar" id="barHIGH" style="width:0%"></div></div><span class="risk-count" id="cntHIGH">0</span></div>
+          <div class="risk-row risk-MEDIUM"><span class="risk-label">🟡 MED</span><div class="risk-track"><div class="risk-bar" id="barMEDIUM" style="width:0%"></div></div><span class="risk-count" id="cntMEDIUM">0</span></div>
+          <div class="risk-row risk-LOW"><span class="risk-label">🟢 LOW</span><div class="risk-track"><div class="risk-bar" id="barLOW" style="width:0%"></div></div><span class="risk-count" id="cntLOW">0</span></div>
+          <div class="risk-row risk-NONE"><span class="risk-label">⚪ NONE</span><div class="risk-track"><div class="risk-bar" id="barNONE" style="width:0%"></div></div><span class="risk-count" id="cntNONE">0</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Live Log</h2>
+        <div class="log-box" id="logBox"></div>
+      </div>
+    </div>
+
+    <!-- Top Flagged -->
+    <div class="card" id="flaggedCard" style="display:none">
+      <h2>🚨 Top Flagged Establishments</h2>
+      <table class="results-table"><thead><tr><th>Licensee</th><th>Phone</th><th>Score</th><th>Flags</th><th>Top Flag</th></tr></thead><tbody id="flaggedBody"></tbody></table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+// ─── Auth token ──────────────────────────────────────────────────────────────
+// Read ?t= from URL once on first load, then strip it from the address bar
+// so it doesn't end up in browser history or referrer headers.
+(function captureToken() {
+  const params = new URLSearchParams(location.search);
+  const t = params.get('t');
+  if (t) {
+    sessionStorage.setItem('serpderp_token', t);
+    params.delete('t');
+    const clean = location.pathname + (params.toString() ? '?' + params : '') + location.hash;
+    history.replaceState(null, '', clean);
+  }
+})();
+const AUTH_TOKEN = sessionStorage.getItem('serpderp_token') || '';
+
+function apiFetch(path, opts = {}) {
+  const headers = { ...(opts.headers || {}), 'X-Auth-Token': AUTH_TOKEN };
+  return fetch(path, { ...opts, headers });
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+const dropZone = $('dropZone');
+const fileInput = $('fileInput');
+const dropFileName = $('dropFileName');
+const progressSection = $('progressSection');
+const progressFill = $('progressFill');
+const progressPct = $('progressPct');
+const progressCount = $('progressCount');
+const progressEta = $('progressEta');
+const progressMsg = $('progressMsg');
+const logBox = $('logBox');
+const completeBanner = $('completeBanner');
+const errorBanner = $('errorBanner');
+const flaggedCard = $('flaggedCard');
+const flaggedBody = $('flaggedBody');
+const btnStart = $('btnStart');
+const btnStop = $('btnStop');
+const disclaimerModal = $('disclaimerModal');
+
+// ─── Disclaimer Modal ────────────────────────────────────────────────────────
+if (sessionStorage.getItem('serpderp_disclaimer_accepted')) {
+  disclaimerModal.classList.add('hidden');
+}
+function acceptDisclaimer() {
+  disclaimerModal.classList.add('hidden');
+  sessionStorage.setItem('serpderp_disclaimer_accepted', '1');
+}
+
+let uploadedCsvPath = '';
+let riskTotals = { HIGH: 0, MEDIUM: 0, LOW: 0, NONE: 0 };
+let totalProcessed = 0;
+let evtSource = null;
+const phaseOrder = ['phone_search', 'address_search', 'deepscan', 'output'];
+
+// ─── Drag & Drop ─────────────────────────────────────────────────────────────
+
+$('btnOpenOutput').addEventListener('click', async () => {
+  try {
+    const res = await apiFetch('/api/open-output', { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { alert('Could not open folder: ' + (data.error || res.statusText)); return; }
+    addLog('Opened output folder: ' + data.path, 'info');
+  } catch (err) {
+    alert('Open folder error: ' + err.message);
+  }
+});
+
+$('downloadTemplate').addEventListener('click', async (e) => {
+  e.preventDefault();
+  try {
+    const res = await apiFetch('/api/template.csv');
+    if (!res.ok) { alert('Template download failed'); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'serpderp-template.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert('Template download error: ' + err.message);
+  }
+});
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+fileInput.addEventListener('change', (e) => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+async function handleFile(file) {
+  if (!file.name.endsWith('.csv')) { alert('Please drop a CSV file'); return; }
+  dropZone.classList.add('has-file');
+  dropFileName.style.display = 'block';
+  dropFileName.textContent = `✅ ${file.name} (${(file.size / 1024).toFixed(0)} KB)`;
+  dropZone.querySelector('.main-text').textContent = 'File ready';
+  dropZone.querySelector('.sub-text').textContent = 'Drop another file to replace';
+
+  // Upload to server
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const res = await apiFetch('/api/upload-csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: e.target.result, filename: file.name }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        uploadedCsvPath = data.path;
+        $('csvPath').value = data.path;
+        addLog(`CSV uploaded: ${file.name} → ${data.path}`, 'info');
+      } else {
+        alert('Upload failed: ' + data.error);
+      }
+    } catch (err) {
+      alert('Upload error: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ─── Pipeline Control ────────────────────────────────────────────────────────
+
+async function startPipeline() {
+  const csvPath = $('csvPath').value.trim();
+  if (!csvPath) { alert('Please drop a CSV file or enter a path'); return; }
+  const apiKey = $('apiKey').value.trim();
+  if (!apiKey) { alert('Please enter your SERPAPI Key'); return; }
+
+  // Reset UI
+  completeBanner.classList.remove('visible');
+  errorBanner.classList.remove('visible');
+  flaggedCard.style.display = 'none';
+  flaggedBody.innerHTML = '';
+  logBox.innerHTML = '';
+  riskTotals = { HIGH: 0, MEDIUM: 0, LOW: 0, NONE: 0 };
+  totalProcessed = 0;
+  updateRiskBars();
+  $('statApi').textContent = '0';
+  $('statCache').textContent = '0';
+  $('statPages').textContent = '0';
+  $('statAddr').textContent = '0';
+  progressFill.style.width = '0%';
+  progressPct.textContent = '0%';
+  progressCount.textContent = '0 / 0';
+  progressEta.textContent = '—';
+  progressMsg.textContent = '';
+  resetPhaseSteps();
+
+  const body = {
+    csvPath,
+    apiKey,
+    limit: parseInt($('limit').value) || 0,
+    outputDir: $('outputDir').value || './output',
+    delay: parseInt($('delay').value) || 1500,
+    fetchDelay: parseInt($('fetchDelay').value) || 500,
+    noCache: $('noCache').checked,
+    addressOnly: $('addressOnly').checked,
+    captureAds: $('captureAds').checked,
+  };
+
+  try {
+    const res = await apiFetch('/api/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error); return; }
+    setRunning(true);
+    connectSSE();
+    addLog('Pipeline started', 'phase');
+  } catch (err) {
+    alert('Failed to start: ' + err.message);
+  }
+}
+
+async function stopPipeline() {
+  try {
+    await apiFetch('/api/stop', { method: 'POST' });
+    addLog('Stop requested...', 'info');
+  } catch (err) {
+    addLog('Stop failed: ' + err.message, 'err');
+  }
+}
+
+// ─── SSE ─────────────────────────────────────────────────────────────────────
+
+function connectSSE() {
+  if (evtSource) evtSource.close();
+  evtSource = new EventSource('/api/events?t=' + encodeURIComponent(AUTH_TOKEN));
+  evtSource.onmessage = (e) => {
+    const d = JSON.parse(e.data);
+    handleEvent(d);
+  };
+  evtSource.onerror = () => {
+    // Reconnect silently
+  };
+}
+
+function handleEvent(d) {
+  switch (d.type) {
+    case 'phase':
+      setPhase(d.phase);
+      addLog(d.message, 'phase');
+      progressMsg.textContent = d.message;
+      break;
+
+    case 'phase_done':
+      markPhaseDone(d.phase);
+      addLog(d.message, 'info');
+      break;
+
+    case 'ingest_done':
+      addLog(`CSV parsed: ${d.total} valid records`, 'info');
+      break;
+
+    case 'search_progress': {
+      const pct = Math.round((d.current / d.total) * 100);
+      progressFill.style.width = pct + '%';
+      progressPct.textContent = pct + '%';
+      progressCount.textContent = `${d.current} / ${d.total}`;
+      $('statApi').textContent = d.apiCalls;
+      $('statCache').textContent = d.cachedSearches;
+
+      const id = d.identifier || '';
+      const cls = d.cached ? 'cache' : (d.hits > 0 ? 'hit' : 'info');
+      const tierTag = d.tier ? ` [${d.tier}]` : '';
+      addLog(`[${d.current}/${d.total}] ${d.licensee} (${id})${tierTag} — ${d.hits} results${d.cached ? ' ⚡ cached' : ''}`, cls);
+
+      if (d.addressSearches !== undefined) $('statAddr').textContent = d.addressSearches || 0;
+      break;
+    }
+
+    case 'deepscan_progress': {
+      const pct = Math.round((d.current / d.total) * 100);
+      progressFill.style.width = pct + '%';
+      progressPct.textContent = pct + '%';
+      progressCount.textContent = `${d.current} / ${d.total}`;
+      $('statPages').textContent = d.pagesFetched;
+
+      if (d.flagsFound > 0) {
+        addLog(`🔍 ${d.licensee} — ${d.flagsFound} flags found`, 'flag');
+        d.flags?.forEach((f) => {
+          addLog(`   ↳ [${f.score}] ${f.url?.slice(0, 60)} — ${f.reason?.slice(0, 80)}`, 'flag');
+        });
+      } else {
+        addLog(`🔍 [${d.current}/${d.total}] ${d.licensee} — clean`, 'info');
+      }
+      break;
+    }
+
+    case 'complete': {
+      setRunning(false);
+      completeBanner.classList.add('visible');
+      const msg = `${d.stats.totalResults} processed, ${d.stats.flaggedCount} flagged in ${(d.elapsed / 1000).toFixed(0)}s | ${d.stats.apiCalls} API + ${d.stats.addressSearches || 0} addr searches`;
+      $('completeMsg').textContent = d.message + ' | ' + msg;
+      addLog('✅ ' + d.message, 'phase');
+
+      riskTotals = d.riskTiers;
+      totalProcessed = d.stats.totalResults;
+      updateRiskBars();
+      $('statApi').textContent = d.stats.apiCalls;
+      $('statCache').textContent = d.stats.cachedSearches;
+      $('statPages').textContent = d.stats.pagesFetched;
+      $('statAddr').textContent = d.stats.addressSearches || 0;
+
+      if (d.topFlagged && d.topFlagged.length > 0) {
+        flaggedCard.style.display = 'block';
+        flaggedBody.innerHTML = d.topFlagged.map((r) => `<tr>
+          <td>${esc(r.licensee)}</td><td style="font-family:var(--mono);font-size:11px">${esc(r.phone)}</td>
+          <td><span class="tier-badge tier-HIGH">${esc(r.riskScore)}</span></td>
+          <td>${esc(r.flagCount)}</td>
+          <td style="font-size:11px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.topFlag || '—')}</td>
+        </tr>`).join('');
+      }
+      markPhaseDone('output');
+      if (evtSource) evtSource.close();
+      break;
+    }
+
+    case 'aborted':
+      setRunning(false);
+      addLog('⏹ ' + d.message, 'phase');
+      if (evtSource) evtSource.close();
+      break;
+
+    case 'error':
+      setRunning(false);
+      errorBanner.classList.add('visible');
+      $('errorMsg').textContent = d.message;
+      addLog('❌ Error: ' + d.message, 'err');
+      if (evtSource) evtSource.close();
+      break;
+  }
+}
+
+// ─── UI Helpers ──────────────────────────────────────────────────────────────
+
+function setRunning(running) {
+  btnStart.disabled = running;
+  btnStop.disabled = !running;
+  const dot = $('statusDot');
+  const label = $('statusLabel');
+  if (running) {
+    dot.className = 'status-dot running';
+    label.textContent = 'Running';
+    progressSection.classList.add('visible');
+  } else {
+    dot.className = 'status-dot done';
+    label.textContent = 'Done';
+  }
+}
+
+function resetPhaseSteps() {
+  document.querySelectorAll('.phase-step').forEach((el) => el.classList.remove('active', 'done'));
+  document.querySelectorAll('.phase-line').forEach((el) => el.classList.remove('done'));
+}
+
+function setPhase(phase) {
+  resetPhaseSteps();
+  const idx = phaseOrder.indexOf(phase);
+  // Mark previous phases done
+  for (let i = 0; i < idx; i++) {
+    const step = document.querySelector(`.phase-step[data-phase="${phaseOrder[i]}"]`);
+    if (step) step.classList.add('done');
+    const line = document.querySelector(`.phase-line[data-after="${phaseOrder[i]}"]`);
+    if (line) line.classList.add('done');
+  }
+  // Mark current active
+  const current = document.querySelector(`.phase-step[data-phase="${phase}"]`);
+  if (current) current.classList.add('active');
+  // Reset progress bar for new phase
+  progressFill.style.width = '0%';
+  progressPct.textContent = '0%';
+}
+
+function markPhaseDone(phase) {
+  const step = document.querySelector(`.phase-step[data-phase="${phase}"]`);
+  if (step) { step.classList.remove('active'); step.classList.add('done'); }
+  const line = document.querySelector(`.phase-line[data-after="${phase}"]`);
+  if (line) line.classList.add('done');
+}
+
+function updateRiskBars() {
+  const total = Math.max(totalProcessed, 1);
+  for (const tier of ['HIGH', 'MEDIUM', 'LOW', 'NONE']) {
+    const count = riskTotals[tier] || 0;
+    const pct = (count / total) * 100;
+    $(`bar${tier}`).style.width = pct + '%';
+    $(`cnt${tier}`).textContent = `${count} (${pct.toFixed(0)}%)`;
+  }
+}
+
+function addLog(msg, cls = 'info') {
+  const ts = new Date().toLocaleTimeString('en-US', { hour12: false });
+  const div = document.createElement('div');
+  div.className = `log-entry ${cls}`;
+  const tsSpan = document.createElement('span');
+  tsSpan.className = 'ts';
+  tsSpan.textContent = ts;
+  div.appendChild(tsSpan);
+  div.appendChild(document.createTextNode(' ' + String(msg ?? '')));
+  logBox.appendChild(div);
+  logBox.scrollTop = logBox.scrollHeight;
+  while (logBox.children.length > 500) logBox.removeChild(logBox.firstChild);
+}
+
+// ─── Auto-connect on page load ───────────────────────────────────────────────
+(async function init() {
+  try {
+    const res = await apiFetch('/api/status');
+    const status = await res.json();
+    if (status.running) {
+      setRunning(true);
+      if (status.phase) setPhase(status.phase);
+      addLog('Reconnected to running pipeline', 'phase');
+      connectSSE();
+    }
+  } catch (e) { /* server not running yet */ }
+})();
+</script>
+</body>
+</html>

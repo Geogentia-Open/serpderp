@@ -1,0 +1,23 @@
+{
+  "name": "serpderp",
+  "version": "1.0.0",
+  "description": "CTI-Ad Triage Tool — Bulk phone search + deep scan for trafficking indicators",
+  "main": "src/cli.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/cli.js",
+    "gui": "node src/server.js",
+    "dry-run": "node src/cli.js --dry-run"
+  },
+  "dependencies": {
+    "csv-parser": "^3.0.0",
+    "csv-writer": "^1.6.0",
+    "dotenv": "^16.4.0",
+    "express": "^5.1.0",
+    "puppeteer": "^24.40.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "private": true
+}
