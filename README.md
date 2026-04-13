@@ -1,8 +1,8 @@
 # SerpDerp
 
-CTI-Ad triage tool for bulk phone-number and address searches against indicator domains used in commercial-sex trafficking advertising. Takes a CSV of licensed massage establishments, queries SerpApi for hits on known escort/review/ad platforms, fetches the resulting pages, scans the content, and produces a scored risk report.
+Counter-Trafficking Ad triage tool for bulk phone-number and address searches against indicator domains used in commercial-sex trafficking advertising. Takes a CSV of licensed massage establishments, queries SerpApi for hits on known escort/review/ad platforms, fetches the resulting pages, scans the content, and produces a scored risk report.
 
-Built for counter-trafficking analysts and licensing investigators. Runs locally — no data leaves your machine except the SerpApi search calls and the HTTP fetches to the flagged URLs.
+Built for counter-trafficking analysts. Runs locally — no data leaves your machine except the SerpApi search calls and the HTTP fetches to the flagged URLs.
 
 ## Quick start
 
@@ -46,7 +46,7 @@ Rows with the same phone number are merged — the first row wins and subsequent
 
 The server runs a four-phase pipeline against the uploaded CSV:
 
-1. **Phone search** — queries `"(phone)" ("girls" OR "escort" OR "rubmaps" OR "sex")` against Google via SerpApi
+1. **Phone search** — queries `"(phone)" and other keywords against Google via SerpApi
 2. **Address search** — for any establishment that didn't hit on phone, queries by street address + city against the same keyword set (catches ads that list address but obfuscate phone)
 3. **Deep scan** — fetches every non-skipped URL returned from phases 1 + 2, extracts visible text, runs keyword/phone/domain heuristics against it. Results are classified by source type: `direct_ad` (1.5× multiplier), `review_site` (1.0×), `aggregator` (0.5×)
 4. **Score & output** — produces a CSV, a JSON, and a human-readable summary in the output directory, plus optional full-page screenshots for high-scoring flags
@@ -64,32 +64,6 @@ Written to `./output/` (configurable per run):
 - `screenshots/` — PNGs from Puppeteer, only if you enabled "Capture ads"
 
 Click **📂 Open Output Folder** in the completion banner to jump directly to the run's output directory.
-
-## CLI mode
-
-For headless / scripted runs:
-
-```bash
-node src/cli.js --csv uploads/yourfile.csv [options]
-
-Options:
-  --csv <path>        Path to input CSV (required)
-  --limit <n>         Max phone numbers to search (0 = all)
-  --delay <ms>        Milliseconds between SerpApi calls (default 1500)
-  --fetch-delay <ms>  Milliseconds between page fetches (default 500)
-  --output <dir>      Output directory (default ./output)
-  --no-cache          Bypass all caches
-  --search-only       Run Phase 1 only (skip deep scan)
-  --dry-run           Parse CSV + show stats, no API calls
-```
-
-In CLI mode the SerpApi key is read from `SERPAPI_KEY` in `.env`:
-
-```
-SERPAPI_KEY=your_key_here
-```
-
-The GUI mode accepts the key via the dashboard form instead — it's never written to disk in GUI mode.
 
 ## Security model
 
